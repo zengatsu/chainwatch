@@ -1,6 +1,6 @@
 use std::env;
 
-use alloy::{consensus::Transaction, network::{AnyNetwork, TransactionResponse}, providers::{Provider, ProviderBuilder, WsConnect}};
+use alloy::{consensus::Transaction, network::{AnyNetwork, TransactionResponse}, primitives::U256, providers::{Provider, ProviderBuilder, WsConnect}};
 use clap::Parser;
 use dotenv::dotenv;
 use eyre::Result;
@@ -12,7 +12,7 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     let threshold_value = cli.threshold.unwrap_or(10);
-    let threshold = alloy::primitives::U256::from(threshold_value).checked_mul(alloy::primitives::U256::from(threshold_value).pow(alloy::primitives::U256::from(18))).unwrap();
+    let threshold = U256::from(threshold_value).checked_mul(U256::from(threshold_value).pow(U256::from(18))).unwrap();
 
     if let Some(block) = cli.block {
         println!("block: {}", block);
@@ -41,6 +41,8 @@ async fn main() -> Result<()> {
 
             println!("Number of transactions: {:?}", block.transactions.hashes().len());
 
+            let mut sum = U256::from(0);
+
             // Get the transaction for this block
             for tx in block.transactions.as_transactions().unwrap() {
                 let value_wei = tx.value();
@@ -48,7 +50,9 @@ async fn main() -> Result<()> {
                     print!("🚨 ");
                 }
                 println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to().unwrap_or_default());
+                sum += value_wei;
             }
+            println!("Sum value of the block: {:?}", sum.checked_div(U256::from(10).pow(U256::from(18))).unwrap_or_default());
             println!("----------------------------------");
         }
 
