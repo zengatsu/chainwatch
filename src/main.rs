@@ -33,6 +33,15 @@ async fn main() -> Result<()> {
             println!("New Block Detected!");
             println!("  Hash:   {:?}", header.hash);
             println!("  Number: {:?}", header.number);
+            if let Ok(Some(block)) = provider.get_block_by_hash(header.hash).await { 
+                println!("Number of transactions: {:?}", block.transactions.hashes().len());
+                // Get the transaction for this block
+                // for tx in block.transactions.as_transactions().unwrap() {
+                //     println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to());
+                // }
+            } else {
+                println!("couldn't get the content of the block");
+            }
             println!("----------------------------------");
         }
 
