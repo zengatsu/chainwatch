@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
     if cli.stream {
         let ws_url = env::var("WS_URL").expect("WS_URL must be set in .env file!");
         let ws = WsConnect::new(ws_url);
-        let provider = ProviderBuilder::new().connect_ws(ws).await?;
+        let provider = ProviderBuilder::new().network::<AnyNetwork>().connect_ws(ws).await?;
         println!("Connected! Waiting for new Arbitrum blocks...");
 
 
@@ -33,14 +33,14 @@ async fn main() -> Result<()> {
             println!("New Block Detected!");
             println!("  Hash:   {:?}", header.hash);
             println!("  Number: {:?}", header.number);
-            if let Ok(Some(block)) = provider.get_block_by_hash(header.hash).await { 
-                println!("Number of transactions: {:?}", block.transactions.hashes().len());
-                // Get the transaction for this block
-                // for tx in block.transactions.as_transactions().unwrap() {
-                //     println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to());
-                // }
-            } else {
-                println!("couldn't get the content of the block");
+
+            let block = provider.get_block_by_hash(header.hash).full().await?.ok_or_else(|| eyre::eyre!("Block details missing"))?;
+
+            println!("Number of transactions: {:?}", block.transactions.hashes().len());
+
+            // Get the transaction for this block
+            for tx in block.transactions.as_transactions().unwrap() {
+                println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to());
             }
             println!("----------------------------------");
         }
