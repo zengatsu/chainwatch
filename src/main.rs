@@ -1,6 +1,6 @@
 use std::env;
 
-use alloy::{consensus::Transaction, network::{AnyNetwork, TransactionResponse}, providers::{Provider, ProviderBuilder, WsConnect}, rpc};
+use alloy::{consensus::Transaction, network::{AnyNetwork, TransactionResponse}, providers::{Provider, ProviderBuilder, WsConnect}};
 use clap::Parser;
 use dotenv::dotenv;
 use eyre::Result;
@@ -10,6 +10,9 @@ use tokio_stream::StreamExt;
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     dotenv().ok();
+
+    let threshold_value = cli.threshold.unwrap_or(10);
+    let threshold = alloy::primitives::U256::from(threshold_value).checked_mul(alloy::primitives::U256::from(threshold_value).pow(alloy::primitives::U256::from(18))).unwrap();
 
     if let Some(block) = cli.block {
         println!("block: {}", block);
@@ -40,7 +43,11 @@ async fn main() -> Result<()> {
 
             // Get the transaction for this block
             for tx in block.transactions.as_transactions().unwrap() {
-                println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to());
+                let value_wei = tx.value();
+                if value_wei >= threshold {
+                    print!("🚨 ");
+                }
+                println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to().unwrap_or_default());
             }
             println!("----------------------------------");
         }
@@ -77,5 +84,8 @@ struct Cli {
 
     #[arg(short, long)]
     block: Option<u64>,
+    
+    #[arg(short, long)]
+    threshold: Option<u64>,
 }
 
