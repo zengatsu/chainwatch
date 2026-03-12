@@ -1,80 +1,73 @@
-use std::env;
+mod service;
+mod state;
+mod tui;
 
-use alloy::{consensus::Transaction, network::{AnyNetwork, TransactionResponse}, primitives::U256, providers::{Provider, ProviderBuilder, WsConnect}};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+use alloy::primitives::U256;
 use clap::Parser;
+use crossterm::{
+    event::{self, Event, KeyCode},
+};
 use dotenv::dotenv;
 use eyre::Result;
-use tokio_stream::StreamExt;
+
+use crate::{
+    service::{get_block_data, stream_transactions},
+    state::AppState,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     dotenv().ok();
 
-    let threshold_value = cli.threshold.unwrap_or(10);
-    let threshold = U256::from(threshold_value).checked_mul(U256::from(threshold_value).pow(U256::from(18))).unwrap();
+    // We should have cli mode
+    //  - show the transaction in a block or latest block
+    //  - stream mode shows the transactions as they come in
+    // Tui mode
+    //  - show the transactions and all stats as they come in
 
-    if let Some(block) = cli.block {
-        println!("block: {}", block);
-    } else {
-        println!("block: Not specified");
-    }
+    let threshold_value = cli.threshold.unwrap_or(10);
+    let threshold = U256::from(threshold_value)
+        .checked_mul(U256::from(threshold_value).pow(U256::from(18)))
+        .unwrap();
+
+    let state = Arc::new(Mutex::new(AppState::new()));
+    let fetch_state = Arc::clone(&state);
 
     if cli.stream {
-        let ws_url = env::var("WS_URL").expect("WS_URL must be set in .env file!");
-        let ws = WsConnect::new(ws_url);
-        let provider = ProviderBuilder::new().network::<AnyNetwork>().connect_ws(ws).await?;
-        println!("Connected! Waiting for new Arbitrum blocks...");
+        let mut terminal = tui::setup_tui()?;
+        terminal.draw(|f| {
+            tui::draw(f, &state);
+        })?;
 
+        stream_transactions(threshold, fetch_state).await?;
+        ///////////////////////////////////
+        loop {
+            terminal.draw(|f| {
+                tui::draw(f, &state);
+            })?;
 
-        // 3. Subscribe to new block headers
-        let subscription = provider.subscribe_blocks().await?;
-        let mut stream = subscription.into_stream();
-
-        // 4. Loop forever as new blocks arrive
-        while let Some(header) = stream.next().await {
-            println!("New Block Detected!");
-            println!("  Hash:   {:?}", header.hash);
-            println!("  Number: {:?}", header.number);
-
-            let block = provider.get_block_by_hash(header.hash).full().await?.ok_or_else(|| eyre::eyre!("Block details missing"))?;
-
-            println!("Number of transactions: {:?}", block.transactions.hashes().len());
-
-            let mut sum = U256::from(0);
-
-            // Get the transaction for this block
-            for tx in block.transactions.as_transactions().unwrap() {
-                let value_wei = tx.value();
-                if value_wei >= threshold {
-                    print!("🚨 ");
+            // Check for "Q" key to quit
+            if event::poll(Duration::from_millis(100))? {
+                if let Event::Key(key) = event::read()? {
+                    if key.code == KeyCode::Char('q') {
+                        break;
+                    }
                 }
-                println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to().unwrap_or_default());
-                sum += value_wei;
             }
-            println!("Sum value of the block: {:?}", sum.checked_div(U256::from(10).pow(U256::from(18))).unwrap_or_default());
-            println!("----------------------------------");
         }
+
+        tui::reset()?;
 
         return Ok(());
     }
 
-    let rpc_url = env::var("RPC_URL").expect("RPC_URL must be set in .env file!");
-    let url = rpc_url.parse()?;
-    let provider = ProviderBuilder::new().network::<AnyNetwork>().connect_http(url);
-
-    let block_number = match cli.block {
-        Some(bn) => bn,
-        None => provider.get_block_number().await?
-    };
-
-    println!("Fetching transactions for Arbitrum block: {}", block_number);
-
-    let block = provider.get_block_by_number(block_number.into()).full().await?.ok_or_else(|| eyre::eyre!("Block not found"))?;
-
-    for tx in block.transactions.as_transactions().unwrap() {
-        println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to());
-    }
+    get_block_data(cli.block).await?;
 
     Ok(())
 }
@@ -88,8 +81,7 @@ struct Cli {
 
     #[arg(short, long)]
     block: Option<u64>,
-    
+
     #[arg(short, long)]
     threshold: Option<u64>,
 }
-
