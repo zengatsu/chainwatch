@@ -91,6 +91,8 @@ pub fn draw(
                 Cell::from(tx.hash.to_string()),
                 Cell::from(tx.from.to_string()),
                 Cell::from(tx.to.to_string()),
+                Cell::from(if tx.is_whale {"X"} else {""}),
+                Cell::from(if tx.is_stylus {"X"} else {""}),
             ])
         })
         .collect();
@@ -99,12 +101,14 @@ pub fn draw(
         rows,
         [
             Constraint::Percentage(40),
-            Constraint::Percentage(30),
-            Constraint::Percentage(30),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(5),
+            Constraint::Percentage(5),
         ],
     )
     .header(
-        Row::new(vec!["Hash", "From", "To"])
+        Row::new(vec!["Hash", "From", "To", "Whale", "Stylus"])
             .style(ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD))
             .bottom_margin(1),
     )

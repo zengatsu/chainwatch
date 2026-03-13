@@ -38,11 +38,18 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
                 // Get the transaction for this block
                 for tx in block.transactions.as_transactions().unwrap() {
                     let value_wei = tx.value();
-                    if value_wei >= threshold {
-                        // TODO: add this to the state
-                    }
                     sum += value_wei;
-                    txs.push(Tx{hash: tx.tx_hash().to_string(), from: tx.from().to_string(), to: tx.to().unwrap_or_default().to_string() });
+                    let is_whale = value_wei >= threshold;
+
+                    let is_stylus = if let Some(to_addr) = tx.to() {
+                        if let Ok(code) = provider.get_code_at(to_addr).await {
+                            code.starts_with(&[0xef, 0x00]) || code.starts_with(&[0x00, 0x61, 0x73, 0x6d])
+                        } else {false}
+                    } else {false};
+
+
+                    let trans = Tx{hash: tx.tx_hash().to_string(), from: tx.from().to_string(), to: tx.to().unwrap_or_default().to_string(), is_whale: is_whale, is_stylus: is_stylus };
+                    txs.push(trans);
                 }
 
                 // if not in tui mode print the stream
@@ -94,7 +101,7 @@ pub async fn get_block_data(block_number: Option<u64>, fetch_state: Arc<Mutex<Ap
 
     let mut txs = Vec::<Tx>::new();
     for tx in block.transactions.as_transactions().unwrap() {
-        txs.push(Tx{hash: tx.tx_hash().to_string(), from: tx.from().to_string(), to: tx.to().unwrap_or_default().to_string() });
+        txs.push(Tx{hash: tx.tx_hash().to_string(), from: tx.from().to_string(), to: tx.to().unwrap_or_default().to_string(), is_whale: false, is_stylus: false });
     }
 
     s.total_blocks = 1;

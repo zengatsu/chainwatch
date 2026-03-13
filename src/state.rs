@@ -26,8 +26,11 @@ impl AppState {
     }
 }
 
+#[derive(Clone)]
 pub struct Transaction {
     pub hash: String,
     pub from: String,
     pub to: String,
+    pub is_whale: bool,
+    pub is_stylus: bool,
 }
