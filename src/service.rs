@@ -4,15 +4,13 @@ use std::{
 };
 
 use alloy::{
-    consensus::Transaction,
-    network::{AnyNetwork, TransactionResponse},
-    primitives::U256,
-    providers::{Provider, ProviderBuilder, WsConnect},
+    consensus::Transaction, network::{AnyNetwork, TransactionResponse}, primitives::U256, providers::{Provider, ProviderBuilder, WsConnect}
 };
 use eyre::Result;
 use tokio_stream::StreamExt;
 
 use crate::state::AppState;
+use crate::state::Transaction as Tx;
 
 pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppState>>, ui: Option<bool>) -> Result<()> {
     let ws_url = env::var("WS_URL").expect("WS_URL must be set in .env file!");
@@ -35,7 +33,7 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
             if let Ok(Some(block)) = response {
 
                 let mut sum = U256::from(0);
-                let mut txs = Vec::<String>::new();
+                let mut txs = Vec::<Tx>::new();
 
                 // Get the transaction for this block
                 for tx in block.transactions.as_transactions().unwrap() {
@@ -44,13 +42,13 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
                         // TODO: add this to the state
                     }
                     sum += value_wei;
-                    txs.push(tx.tx_hash().to_string());
+                    txs.push(Tx{hash: tx.tx_hash().to_string(), from: tx.from().to_string(), to: tx.to().unwrap_or_default().to_string() });
                 }
 
                 // if not in tui mode print the stream
                 if !ui.unwrap_or(false) {
                     for tx in &txs {
-                        println!("block: {:?}, tx: {:?}", header.number,  tx);
+                        println!("block: {:?}, tx: {:?}, {:?} -> {:?}", header.number,  tx.hash, tx.from, tx.to);
                     }
                 }
 
@@ -94,9 +92,9 @@ pub async fn get_block_data(block_number: Option<u64>, fetch_state: Arc<Mutex<Ap
 
     let mut s = fetch_state.lock().unwrap();
 
-    let mut txs = Vec::<String>::new();
+    let mut txs = Vec::<Tx>::new();
     for tx in block.transactions.as_transactions().unwrap() {
-        txs.push(tx.tx_hash().to_string());
+        txs.push(Tx{hash: tx.tx_hash().to_string(), from: tx.from().to_string(), to: tx.to().unwrap_or_default().to_string() });
     }
 
     s.total_blocks = 1;
