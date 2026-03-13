@@ -14,7 +14,7 @@ use tokio_stream::StreamExt;
 
 use crate::state::AppState;
 
-pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppState>>) -> Result<()> {
+pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppState>>, ui: Option<bool>) -> Result<()> {
     let ws_url = env::var("WS_URL").expect("WS_URL must be set in .env file!");
     let ws = WsConnect::new(ws_url);
     let provider = ProviderBuilder::new()
@@ -30,14 +30,9 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
     // 4. Loop forever as new blocks arrive
     tokio::spawn(async move {
         while let Some(header) = stream.next().await {
-            // println!("New Block Detected!");
-            // println!("  Hash:   {:?}", header.hash);
-            // println!("  Number: {:?}", header.number);
-
             let response = provider.get_block_by_hash(header.hash).full().await;
 
             if let Ok(Some(block)) = response {
-                // println!("Number of transactions: {:?}", block.transactions.hashes().len());
 
                 let mut sum = U256::from(0);
                 let mut txs = Vec::<String>::new();
@@ -46,15 +41,18 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
                 for tx in block.transactions.as_transactions().unwrap() {
                     let value_wei = tx.value();
                     if value_wei >= threshold {
-                        // print!("🚨 ");
+                        // TODO: add this to the state
                     }
-                    // println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to().unwrap_or_default());
                     sum += value_wei;
                     txs.push(tx.tx_hash().to_string());
                 }
 
-                // println!("Sum value of the block: {:?}", sum.checked_div(U256::from(10).pow(U256::from(18))).unwrap_or_default());
-                // println!("----------------------------------");
+                // if not in tui mode print the stream
+                if !ui.unwrap_or(false) {
+                    for tx in &txs {
+                        println!("block: {:?}, tx: {:?}", header.number,  tx);
+                    }
+                }
 
                 let mut s = fetch_state.lock().unwrap();
                 s.total_blocks += 1;
@@ -75,7 +73,7 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
     Ok(())
 }
 
-pub async fn get_block_data(block_number: Option<u64>) -> Result<()> {
+pub async fn get_block_data(block_number: Option<u64>, fetch_state: Arc<Mutex<AppState>>) -> Result<()> {
     let rpc_url = env::var("RPC_URL").expect("RPC_URL must be set in .env file!");
     let url = rpc_url.parse()?;
     let provider = ProviderBuilder::new()
@@ -87,7 +85,6 @@ pub async fn get_block_data(block_number: Option<u64>) -> Result<()> {
         None => provider.get_block_number().await?,
     };
 
-    // println!("Fetching transactions for Arbitrum block: {}", bn);
 
     let block = provider
         .get_block_by_number(bn.into())
@@ -95,9 +92,17 @@ pub async fn get_block_data(block_number: Option<u64>) -> Result<()> {
         .await?
         .ok_or_else(|| eyre::eyre!("Block not found"))?;
 
+    let mut s = fetch_state.lock().unwrap();
+
+    let mut txs = Vec::<String>::new();
     for tx in block.transactions.as_transactions().unwrap() {
-        // println!("{:?}: {:?} - {:?}", tx.tx_hash(), tx.from(), tx.to());
+        txs.push(tx.tx_hash().to_string());
     }
+
+    s.total_blocks = 1;
+    s.total_txs = txs.len() as u64;
+    s.last_blocks.push_front(bn);
+    s.last_txs = txs.into();
 
     Ok(())
 }

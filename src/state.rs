@@ -18,4 +18,10 @@ impl AppState {
             total_txs: 0,
         }
     }
+
+    pub fn print(self: &Self) {
+        for tx in &self.last_txs {
+            println!("block: {:?}, tx: {:?}", &self.last_blocks.iter().last().unwrap_or(&0), tx);
+        }
+    }
 }

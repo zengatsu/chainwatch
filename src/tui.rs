@@ -14,11 +14,14 @@ use eyre::Result;
 
 use crate::state::AppState;
 
-pub fn setup_tui() -> Result<Terminal<CrosstermBackend<Stdout>>> {
-
-        enable_raw_mode()?;
+pub fn setup_tui(raw_mode: Option<bool>) -> Result<Terminal<CrosstermBackend<Stdout>>> {
         let mut stdout = std::io::stdout();
-        execute!(stdout, EnterAlternateScreen)?;
+
+        if raw_mode.unwrap_or(false) {
+            enable_raw_mode()?;
+            execute!(stdout, EnterAlternateScreen)?;
+        }
+
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
 
