@@ -1,6 +1,8 @@
 
 use std::collections::VecDeque;
 
+use alloy::primitives::{U256};
+
 
 pub struct AppState {
     pub last_blocks: VecDeque<u64>,
@@ -28,9 +30,11 @@ impl AppState {
 
 #[derive(Clone)]
 pub struct Transaction {
+    pub block: u64,
     pub hash: String,
     pub from: String,
     pub to: String,
+    pub value: U256,
     pub is_whale: bool,
     pub is_stylus: bool,
 }

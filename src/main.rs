@@ -15,7 +15,7 @@ use eyre::Result;
 
 use crate::{
     service::{get_block_data, stream_transactions},
-    state::AppState,
+    state::{AppState, Transaction},
 };
 
 #[tokio::main]
@@ -28,11 +28,29 @@ async fn main() -> Result<()> {
         .checked_mul(U256::from(threshold_value).pow(U256::from(18)))
         .unwrap();
 
+    let (tx_sender, mut tx_receiver) = tokio::sync::mpsc::channel::<Transaction>(100);
+
+    let pool = sqlx::SqlitePool::connect("sqlite:data.db").await?;
+    tokio::spawn(async move {
+        while let Some(tx) = tx_receiver.recv().await {
+            let value_str = tx.value.to_string();
+            let block = tx.block as i64;
+            sqlx::query!(
+                "INSERT INTO transactions (block_number, tx_hash, contract_address, eth_value, is_whale, is_stylus) 
+                VALUES (?, ?, ?, ?, ?, ?)",
+                block, tx.hash, tx.to, value_str, tx.is_whale, tx.is_stylus
+            )
+            .execute(&pool)
+            .await
+            .ok();
+        }
+    });
+
     let state = Arc::new(Mutex::new(AppState::new()));
     let fetch_state = Arc::clone(&state);
 
     if cli.stream {
-        stream_transactions(threshold, fetch_state, Some(cli.ui)).await?;
+        stream_transactions(threshold, fetch_state, tx_sender, Some(cli.ui)).await?;
 
         // Initialize terminal using .then() for a more functional approach
         let mut terminal = cli.ui.then(|| tui::setup_tui(Some(true))).transpose()?;
@@ -40,7 +58,9 @@ async fn main() -> Result<()> {
         loop {
             // Use .as_mut() to interact with the terminal only if it exists
             if let Some(t) = terminal.as_mut() {
-                t.draw(|f| {tui::draw(f, &state);})?;
+                t.draw(|f| {
+                    tui::draw(f, &state);
+                })?;
 
                 // Check for "Q" key to quit
                 if event::poll(Duration::from_millis(100))? {

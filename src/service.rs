@@ -4,15 +4,24 @@ use std::{
 };
 
 use alloy::{
-    consensus::Transaction, network::{AnyNetwork, TransactionResponse}, primitives::U256, providers::{Provider, ProviderBuilder, WsConnect}
+    consensus::Transaction,
+    network::{AnyNetwork, TransactionResponse},
+    primitives::U256,
+    providers::{Provider, ProviderBuilder, WsConnect},
 };
 use eyre::Result;
+use tokio::sync::mpsc::Sender;
 use tokio_stream::StreamExt;
 
 use crate::state::AppState;
 use crate::state::Transaction as Tx;
 
-pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppState>>, ui: Option<bool>) -> Result<()> {
+pub async fn stream_transactions(
+    threshold: U256,
+    fetch_state: Arc<Mutex<AppState>>,
+    tx_sender: Sender<Tx>,
+    ui: Option<bool>,
+) -> Result<()> {
     let ws_url = env::var("WS_URL").expect("WS_URL must be set in .env file!");
     let ws = WsConnect::new(ws_url);
     let provider = ProviderBuilder::new()
@@ -31,7 +40,6 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
             let response = provider.get_block_by_hash(header.hash).full().await;
 
             if let Ok(Some(block)) = response {
-
                 let mut sum = U256::from(0);
                 let mut txs = Vec::<Tx>::new();
 
@@ -43,19 +51,37 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
 
                     let is_stylus = if let Some(to_addr) = tx.to() {
                         if let Ok(code) = provider.get_code_at(to_addr).await {
-                            code.starts_with(&[0xef, 0x00]) || code.starts_with(&[0x00, 0x61, 0x73, 0x6d])
-                        } else {false}
-                    } else {false};
+                            code.starts_with(&[0xef, 0x00])
+                                || code.starts_with(&[0x00, 0x61, 0x73, 0x6d])
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
 
-
-                    let trans = Tx{hash: tx.tx_hash().to_string(), from: tx.from().to_string(), to: tx.to().unwrap_or_default().to_string(), is_whale: is_whale, is_stylus: is_stylus };
+                    let trans = Tx {
+                        hash: tx.tx_hash().to_string(),
+                        from: tx.from().to_string(),
+                        to: tx.to().unwrap_or_default().to_string(),
+                        is_whale: is_whale,
+                        is_stylus: is_stylus,
+                        block: tx.block_number().unwrap_or_default(),
+                        value: value_wei,
+                    };
+                    if is_whale || is_stylus {
+                        let _ = tx_sender.send(trans.clone()).await;
+                    }
                     txs.push(trans);
                 }
 
                 // if not in tui mode print the stream
                 if !ui.unwrap_or(false) {
                     for tx in &txs {
-                        println!("block: {:?}, tx: {:?}, {:?} -> {:?}", header.number,  tx.hash, tx.from, tx.to);
+                        println!(
+                            "block: {:?}, tx: {:?}, {:?} -> {:?}",
+                            header.number, tx.hash, tx.from, tx.to
+                        );
                     }
                 }
 
@@ -78,7 +104,10 @@ pub async fn stream_transactions(threshold: U256, fetch_state: Arc<Mutex<AppStat
     Ok(())
 }
 
-pub async fn get_block_data(block_number: Option<u64>, fetch_state: Arc<Mutex<AppState>>) -> Result<()> {
+pub async fn get_block_data(
+    block_number: Option<u64>,
+    fetch_state: Arc<Mutex<AppState>>,
+) -> Result<()> {
     let rpc_url = env::var("RPC_URL").expect("RPC_URL must be set in .env file!");
     let url = rpc_url.parse()?;
     let provider = ProviderBuilder::new()
@@ -90,7 +119,6 @@ pub async fn get_block_data(block_number: Option<u64>, fetch_state: Arc<Mutex<Ap
         None => provider.get_block_number().await?,
     };
 
-
     let block = provider
         .get_block_by_number(bn.into())
         .full()
@@ -101,7 +129,15 @@ pub async fn get_block_data(block_number: Option<u64>, fetch_state: Arc<Mutex<Ap
 
     let mut txs = Vec::<Tx>::new();
     for tx in block.transactions.as_transactions().unwrap() {
-        txs.push(Tx{hash: tx.tx_hash().to_string(), from: tx.from().to_string(), to: tx.to().unwrap_or_default().to_string(), is_whale: false, is_stylus: false });
+        txs.push(Tx {
+            hash: tx.tx_hash().to_string(),
+            from: tx.from().to_string(),
+            to: tx.to().unwrap_or_default().to_string(),
+            is_whale: false,
+            is_stylus: false,
+            block: tx.block_number.unwrap_or_default(),
+            value: tx.value(),
+        });
     }
 
     s.total_blocks = 1;
