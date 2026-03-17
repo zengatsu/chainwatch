@@ -1,4 +1,5 @@
-mod service;
+mod arbitrum;
+mod db;
 mod state;
 mod tui;
 
@@ -13,10 +14,8 @@ use crossterm::event::{self, Event, KeyCode};
 use dotenv::dotenv;
 use eyre::Result;
 
-use crate::{
-    service::{get_block_data, stream_transactions},
-    state::{AppState, Transaction},
-};
+use arbitrum::{get_block_data, stream_transactions};
+use state::{AppState, Transaction};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,16 +28,17 @@ async fn main() -> Result<()> {
         .unwrap();
 
     let (tx_sender, mut tx_receiver) = tokio::sync::mpsc::channel::<Transaction>(100);
-
     let pool = sqlx::SqlitePool::connect("sqlite:data/data.db").await?;
+    let pool_clone = pool.clone();
+
     tokio::spawn(async move {
         while let Some(tx) = tx_receiver.recv().await {
-            let value_str = tx.value.to_string();
-            let block = tx.block as i64;
+            let value_str = tx.eth_value.to_string();
+            let block = tx.block_number as i64;
             sqlx::query!(
                 "INSERT INTO transactions (block_number, tx_hash, from_addr, to_addr, eth_value, is_whale, is_stylus) 
                 VALUES (?, ?, ?, ?, ?, ?, ?)",
-                block, tx.hash, tx.from, tx.to, value_str, tx.is_whale, tx.is_stylus
+                block, tx.tx_hash, tx.from_addr, tx.to_addr, value_str, tx.is_whale, tx.is_stylus
             )
             .execute(&pool)
             .await
@@ -48,6 +48,10 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(Mutex::new(AppState::new()));
     let fetch_state = Arc::clone(&state);
+    let mut tab = 0;
+
+    let txs = db::get_cached_txs(&pool_clone).await;
+    state.lock().unwrap().chached_txs = txs?;
 
     if cli.stream {
         stream_transactions(threshold, fetch_state, tx_sender, Some(cli.ui)).await?;
@@ -59,14 +63,17 @@ async fn main() -> Result<()> {
             // Use .as_mut() to interact with the terminal only if it exists
             if let Some(t) = terminal.as_mut() {
                 t.draw(|f| {
-                    tui::draw(f, &state);
+                    tui::draw(f, tab, &state);
                 })?;
 
                 // Check for "Q" key to quit
                 if event::poll(Duration::from_millis(100))? {
                     if let Event::Key(key) = event::read()? {
-                        if key.code == KeyCode::Char('q') {
-                            break;
+                        match key.code {
+                            KeyCode::Char('q') => break,
+                            KeyCode::Char('l') | KeyCode::Right => tab = (tab + 1) % 2,
+                            KeyCode::Char('h') | KeyCode::Left => tab = (tab + 2) % 2,
+                            _ => {}
                         }
                     }
                 }
@@ -84,7 +91,7 @@ async fn main() -> Result<()> {
     if cli.ui {
         let mut terminal = tui::setup_tui(None)?;
         terminal.draw(|f| {
-            tui::draw(f, &state);
+            tui::draw(f, tab, &state);
         })?;
     } else {
         state.lock().unwrap().print();

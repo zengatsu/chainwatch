@@ -61,13 +61,13 @@ pub async fn stream_transactions(
                     };
 
                     let trans = Tx {
-                        hash: tx.tx_hash().to_string(),
-                        from: tx.from().to_string(),
-                        to: tx.to().unwrap_or_default().to_string(),
+                        tx_hash: tx.tx_hash().to_string(),
+                        from_addr: tx.from().to_string(),
+                        to_addr: tx.to().unwrap_or_default().to_string(),
                         is_whale: is_whale,
                         is_stylus: is_stylus,
-                        block: tx.block_number().unwrap_or_default(),
-                        value: value_wei,
+                        block_number: tx.block_number().unwrap_or_default(),
+                        eth_value: value_wei.to_string(),
                     };
                     if is_whale || is_stylus {
                         let _ = tx_sender.send(trans.clone()).await;
@@ -80,7 +80,7 @@ pub async fn stream_transactions(
                     for tx in &txs {
                         println!(
                             "block: {:?}, tx: {:?}, {:?} -> {:?}",
-                            header.number, tx.hash, tx.from, tx.to
+                            header.number, tx.tx_hash, tx.from_addr, tx.to_addr
                         );
                     }
                 }
@@ -130,13 +130,13 @@ pub async fn get_block_data(
     let mut txs = Vec::<Tx>::new();
     for tx in block.transactions.as_transactions().unwrap() {
         txs.push(Tx {
-            hash: tx.tx_hash().to_string(),
-            from: tx.from().to_string(),
-            to: tx.to().unwrap_or_default().to_string(),
+            tx_hash: tx.tx_hash().to_string(),
+            from_addr: tx.from().to_string(),
+            to_addr: tx.to().unwrap_or_default().to_string(),
             is_whale: false,
             is_stylus: false,
-            block: tx.block_number.unwrap_or_default(),
-            value: tx.value(),
+            block_number: tx.block_number.unwrap_or_default(),
+            eth_value: tx.value().to_string(),
         });
     }
 

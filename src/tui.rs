@@ -4,18 +4,19 @@ use crossterm::{
 };
 use eyre::Result;
 use ratatui::{
-    Terminal,
+    Frame, Terminal,
     backend::CrosstermBackend,
-    layout::Constraint,
-    widgets::{Block, Borders, List, ListItem, Paragraph},
-    widgets::{Cell, Row, Table},
+    layout::{Constraint, Offset, Rect},
+    style::{Color, Style},
+    symbols,
+    widgets::{Block, Borders, Cell, List, ListItem, Row, Table, Tabs},
 };
 use std::{
     io::Stdout,
     sync::{Arc, Mutex},
 };
 
-use crate::state::AppState;
+use crate::state::{AppState, Transaction};
 
 pub fn setup_tui(raw_mode: Option<bool>) -> Result<Terminal<CrosstermBackend<Stdout>>> {
     let mut stdout = std::io::stdout();
@@ -38,12 +39,8 @@ pub fn reset() -> Result<()> {
     Ok(())
 }
 
-pub fn draw(
-    f: &mut ratatui::Frame<'_>,
-    state: &Arc<Mutex<AppState>>,
-) {
+pub fn draw(f: &mut Frame<'_>, selected_tab: usize, state: &Arc<Mutex<AppState>>) {
     let size = f.area();
-
     let main_chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
         .constraints([
@@ -52,22 +49,44 @@ pub fn draw(
         ])
         .split(size);
 
+    match selected_tab {
+        0 => render_streaming_tab(f, main_chunks[1], state),
+        1 => render_cached_txs(f, main_chunks[1], &state.lock().unwrap().chached_txs),
+
+        _ => unreachable!(),
+    };
+
+    render_tabs(f, main_chunks[0] + Offset::new(1, 0), selected_tab);
+}
+
+pub fn render_tabs(f: &mut Frame, area: Rect, selected_tab: usize) {
+    let tabs = Tabs::new(vec!["Tab1", "Tab2", "Tab3"])
+        .style(Color::White)
+        .highlight_style(Style::default().magenta().on_black().bold())
+        .select(selected_tab)
+        .divider(symbols::DOT)
+        .padding(" ", " ");
+    f.render_widget(tabs, area);
+}
+
+fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &Arc<Mutex<AppState>>) {
     let content_chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Horizontal)
         .constraints([
             ratatui::layout::Constraint::Percentage(100),
             ratatui::layout::Constraint::Length(20),
         ])
-        .split(main_chunks[1]);
+        .split(main_chunk);
 
-    // 2. Render Stats
     let state = state.lock().unwrap();
-    let stats = Paragraph::new(format!(
-        "Total Blocks: {} | Total TXs: {}",
-        state.total_blocks, state.total_txs
-    ))
-    .block(Block::default().title("Stats").borders(Borders::ALL));
-    f.render_widget(stats, main_chunks[0]);
+
+    // // 2. Render Stats
+    // let stats = Paragraph::new(format!(
+    //     "Total Blocks: {} | Total TXs: {}",
+    //     state.total_blocks, state.total_txs
+    // ))
+    // .block(Block::default().title("Stats").borders(Borders::ALL));
+    // f.render_widget(stats, main_chunks[0]);
 
     // 3. Render Blocks List
     let blocks: Vec<ListItem> = state
@@ -88,11 +107,11 @@ pub fn draw(
         .iter()
         .map(|tx| {
             Row::new(vec![
-                Cell::from(tx.hash.to_string()),
-                Cell::from(tx.from.to_string()),
-                Cell::from(tx.to.to_string()),
-                Cell::from(if tx.is_whale {"X"} else {""}),
-                Cell::from(if tx.is_stylus {"X"} else {""}),
+                Cell::from(tx.tx_hash.to_string()),
+                Cell::from(tx.from_addr.to_string()),
+                Cell::from(tx.to_addr.to_string()),
+                Cell::from(if tx.is_whale { "X" } else { "" }),
+                Cell::from(if tx.is_stylus { "X" } else { "" }),
             ])
         })
         .collect();
@@ -120,5 +139,44 @@ pub fn draw(
     .column_spacing(1);
 
     f.render_widget(table, content_chunks[0]);
+}
 
+fn render_cached_txs(f: &mut Frame, main: Rect, transactions: &Vec<Transaction>) {
+    // 3. Render transactions List
+    let rows: Vec<Row> = transactions
+        .iter()
+        .map(|tx| {
+            Row::new(vec![
+                Cell::from(tx.tx_hash.to_string()),
+                Cell::from(tx.from_addr.to_string()),
+                Cell::from(tx.to_addr.to_string()),
+                Cell::from(if tx.is_whale { "X" } else { "" }),
+                Cell::from(if tx.is_stylus { "X" } else { "" }),
+            ])
+        })
+        .collect();
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Percentage(40),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(5),
+            Constraint::Percentage(5),
+        ],
+    )
+    .header(
+        Row::new(vec!["Hash", "From", "To", "Whale", "Stylus"])
+            .style(ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD))
+            .bottom_margin(1),
+    )
+    .block(
+        Block::default()
+            .title("Recent Transactions")
+            .borders(Borders::ALL),
+    )
+    .column_spacing(1);
+
+    f.render_widget(table, main);
 }
