@@ -30,15 +30,15 @@ async fn main() -> Result<()> {
 
     let (tx_sender, mut tx_receiver) = tokio::sync::mpsc::channel::<Transaction>(100);
 
-    let pool = sqlx::SqlitePool::connect("sqlite:data.db").await?;
+    let pool = sqlx::SqlitePool::connect("sqlite:data/data.db").await?;
     tokio::spawn(async move {
         while let Some(tx) = tx_receiver.recv().await {
             let value_str = tx.value.to_string();
             let block = tx.block as i64;
             sqlx::query!(
-                "INSERT INTO transactions (block_number, tx_hash, contract_address, eth_value, is_whale, is_stylus) 
-                VALUES (?, ?, ?, ?, ?, ?)",
-                block, tx.hash, tx.to, value_str, tx.is_whale, tx.is_stylus
+                "INSERT INTO transactions (block_number, tx_hash, from_addr, to_addr, eth_value, is_whale, is_stylus) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)",
+                block, tx.hash, tx.from, tx.to, value_str, tx.is_whale, tx.is_stylus
             )
             .execute(&pool)
             .await

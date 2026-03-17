@@ -1,10 +1,11 @@
-CREATE TABLE IF NOT EXISTS stylus_events (
+CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     block_number INTEGER NOT NULL,
     tx_hash TEXT NOT NULL UNIQUE,
-    contract_address TEXT NOT NULL,
+    from_addr TEXT NOT NULL,
+    to_addr TEXT NOT NULL,
     eth_value TEXT,
-    is_whale,
+    is_whale BOOLEAN,
 	is_stylus BOOLEAN,
     detected_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
