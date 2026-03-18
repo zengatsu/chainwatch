@@ -6,17 +6,19 @@ use eyre::Result;
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Constraint, Offset, Rect},
+    layout::{Constraint, Margin, Offset, Rect},
     style::{Color, Style},
     symbols,
-    widgets::{Block, Borders, Cell, List, ListItem, Row, Table, Tabs},
+    widgets::{
+        Block, Borders, Cell, List, ListItem, Row, Scrollbar, ScrollbarOrientation, Table, Tabs,
+    },
 };
 use std::{
     io::Stdout,
     sync::{Arc, Mutex},
 };
 
-use crate::state::{AppState, Transaction};
+use crate::state::AppState;
 
 pub fn setup_tui(raw_mode: Option<bool>) -> Result<Terminal<CrosstermBackend<Stdout>>> {
     let mut stdout = std::io::stdout();
@@ -51,7 +53,7 @@ pub fn draw(f: &mut Frame<'_>, selected_tab: usize, state: &Arc<Mutex<AppState>>
 
     match selected_tab {
         0 => render_streaming_tab(f, main_chunks[1], state),
-        1 => render_cached_txs(f, main_chunks[1], &state.lock().unwrap().chached_txs),
+        1 => render_cached_txs(f, main_chunks[1], &state),
 
         _ => unreachable!(),
     };
@@ -141,9 +143,11 @@ fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &Arc<Mutex<A
     f.render_widget(table, content_chunks[0]);
 }
 
-fn render_cached_txs(f: &mut Frame, main: Rect, transactions: &Vec<Transaction>) {
+fn render_cached_txs(f: &mut Frame, main: Rect, state: &Arc<Mutex<AppState>>) {
+    let mut state = state.lock().unwrap();
     // 3. Render transactions List
-    let rows: Vec<Row> = transactions
+    let rows: Vec<Row> = state
+        .cached_txs()
         .iter()
         .map(|tx| {
             Row::new(vec![
@@ -178,5 +182,18 @@ fn render_cached_txs(f: &mut Frame, main: Rect, transactions: &Vec<Transaction>)
     )
     .column_spacing(1);
 
-    f.render_widget(table, main);
+    f.render_stateful_widget(table, main, &mut state.cached_t_state);
+
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("↑"))
+        .end_symbol(Some("↓"));
+
+    f.render_stateful_widget(
+        scrollbar,
+        main.inner(Margin {
+            vertical: 1, // Offset from top/bottom borders
+            horizontal: 0,
+        }),
+        &mut state.cached_sb_state,
+    );
 }

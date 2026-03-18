@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
     let mut tab = 0;
 
     let txs = db::get_cached_txs(&pool_clone).await;
-    state.lock().unwrap().chached_txs = txs?;
+    state.lock().unwrap().set_cached_txs(txs?);
 
     if cli.stream {
         stream_transactions(threshold, fetch_state, tx_sender, Some(cli.ui)).await?;
@@ -73,6 +73,8 @@ async fn main() -> Result<()> {
                             KeyCode::Char('q') => break,
                             KeyCode::Char('l') | KeyCode::Right => tab = (tab + 1) % 2,
                             KeyCode::Char('h') | KeyCode::Left => tab = (tab + 2) % 2,
+                            KeyCode::Up | KeyCode::Char('k') => state.lock().unwrap().previous(),
+                            KeyCode::Down | KeyCode::Char('j') => state.lock().unwrap().next(),
                             _ => {}
                         }
                     }
