@@ -4,6 +4,7 @@ mod state;
 mod tui;
 
 use std::{
+    env,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -29,8 +30,12 @@ async fn main() -> Result<()> {
         .checked_mul(U256::from(threshold_value).pow(U256::from(18)))
         .unwrap();
 
+    let db_url = cli
+        .db_url
+        .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env file!"));
+
     let (tx_sender, mut tx_receiver) = tokio::sync::mpsc::channel::<Transaction>(100);
-    let pool = sqlx::SqlitePool::connect("sqlite:data/data.db").await?;
+    let pool = sqlx::SqlitePool::connect(&db_url).await?;
     let pool_clone = pool.clone();
 
     tokio::spawn(async move {
@@ -56,7 +61,10 @@ async fn main() -> Result<()> {
     state.lock().unwrap().set_cached_txs(txs?);
 
     if cli.stream {
-        stream_transactions(threshold, fetch_state, tx_sender, Some(cli.ui)).await?;
+        let ws_url = cli
+            .ws
+            .unwrap_or(env::var("WS_URL").expect("WS_URL must be set in .env file!"));
+        stream_transactions(ws_url, threshold, fetch_state, tx_sender, Some(cli.ui)).await?;
 
         // Initialize terminal using .then() for a more functional approach
         let mut terminal = cli.ui.then(|| tui::setup_tui(Some(true))).transpose()?;
@@ -91,7 +99,10 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    get_block_data(cli.block, fetch_state).await?;
+    let rpc_url = cli
+        .rpc
+        .unwrap_or(env::var("RPC_URL").expect("RPC_URL must be set in .env file!"));
+    get_block_data(rpc_url, cli.block, fetch_state).await?;
     if cli.ui {
         let mut terminal = tui::setup_tui(None)?;
         terminal.draw(|f| {
@@ -119,4 +130,13 @@ struct Cli {
 
     #[arg(short, long)]
     ui: bool,
+
+    #[arg(short, long)]
+    ws: Option<String>,
+
+    #[arg(short, long)]
+    rpc: Option<String>,
+
+    #[arg(short, long)]
+    db_url: Option<String>,
 }

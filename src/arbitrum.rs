@@ -1,7 +1,4 @@
-use std::{
-    env,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use alloy::{
     consensus::Transaction,
@@ -17,12 +14,12 @@ use crate::state::AppState;
 use crate::state::Transaction as Tx;
 
 pub async fn stream_transactions(
+    ws_url: String,
     threshold: U256,
     fetch_state: Arc<Mutex<AppState>>,
     tx_sender: Sender<Tx>,
     ui: Option<bool>,
 ) -> Result<()> {
-    let ws_url = env::var("WS_URL").expect("WS_URL must be set in .env file!");
     let ws = WsConnect::new(ws_url);
     let provider = ProviderBuilder::new()
         .network::<AnyNetwork>()
@@ -105,10 +102,10 @@ pub async fn stream_transactions(
 }
 
 pub async fn get_block_data(
+    rpc_url: String,
     block_number: Option<u64>,
     fetch_state: Arc<Mutex<AppState>>,
 ) -> Result<()> {
-    let rpc_url = env::var("RPC_URL").expect("RPC_URL must be set in .env file!");
     let url = rpc_url.parse()?;
     let provider = ProviderBuilder::new()
         .network::<AnyNetwork>()
