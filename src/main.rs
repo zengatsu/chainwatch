@@ -17,6 +17,8 @@ use eyre::Result;
 use arbitrum::{get_block_data, stream_transactions};
 use state::{AppState, Transaction};
 
+const TABS: usize = 2;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -71,8 +73,8 @@ async fn main() -> Result<()> {
                     if let Event::Key(key) = event::read()? {
                         match key.code {
                             KeyCode::Char('q') => break,
-                            KeyCode::Char('l') | KeyCode::Right => tab = (tab + 1) % 2,
-                            KeyCode::Char('h') | KeyCode::Left => tab = (tab + 2) % 2,
+                            KeyCode::Char('l') | KeyCode::Right => tab = (tab + TABS + 1) % TABS,
+                            KeyCode::Char('h') | KeyCode::Left => tab = (tab + TABS - 1) % TABS,
                             KeyCode::Up | KeyCode::Char('k') => state.lock().unwrap().previous(),
                             KeyCode::Down | KeyCode::Char('j') => state.lock().unwrap().next(),
                             _ => {}

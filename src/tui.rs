@@ -10,7 +10,8 @@ use ratatui::{
     style::{Color, Style},
     symbols,
     widgets::{
-        Block, Borders, Cell, List, ListItem, Row, Scrollbar, ScrollbarOrientation, Table, Tabs,
+        Block, Borders, Cell, List, ListItem, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        Table, Tabs,
     },
 };
 use std::{
@@ -47,22 +48,36 @@ pub fn draw(f: &mut Frame<'_>, selected_tab: usize, state: &Arc<Mutex<AppState>>
         .direction(ratatui::layout::Direction::Vertical)
         .constraints([
             ratatui::layout::Constraint::Length(3),
+            ratatui::layout::Constraint::Length(3),
             ratatui::layout::Constraint::Min(0),
         ])
         .split(size);
 
+    let tabs_chunk = main_chunks[0];
+    let stats_chunk = main_chunks[1];
+    let content_chunk = main_chunks[2];
+
+    let mut state = state.lock().unwrap();
+
+    let stats = Paragraph::new(format!(
+        "Total Blocks: {} | Total TXs: {}",
+        state.total_blocks, state.total_txs
+    ))
+    .block(Block::default().title("Stats").borders(Borders::ALL));
+    f.render_widget(stats, stats_chunk);
+
     match selected_tab {
-        0 => render_streaming_tab(f, main_chunks[1], state),
-        1 => render_cached_txs(f, main_chunks[1], &state),
+        0 => render_streaming_tab(f, content_chunk, &state),
+        1 => render_cached_txs(f, content_chunk, &mut state),
 
         _ => unreachable!(),
     };
 
-    render_tabs(f, main_chunks[0] + Offset::new(1, 0), selected_tab);
+    render_tabs(f, tabs_chunk + Offset::new(1, 0), selected_tab);
 }
 
 pub fn render_tabs(f: &mut Frame, area: Rect, selected_tab: usize) {
-    let tabs = Tabs::new(vec!["Tab1", "Tab2", "Tab3"])
+    let tabs = Tabs::new(vec!["Transactions", "Saved Transactions"])
         .style(Color::White)
         .highlight_style(Style::default().magenta().on_black().bold())
         .select(selected_tab)
@@ -71,7 +86,7 @@ pub fn render_tabs(f: &mut Frame, area: Rect, selected_tab: usize) {
     f.render_widget(tabs, area);
 }
 
-fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &Arc<Mutex<AppState>>) {
+fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &AppState) {
     let content_chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Horizontal)
         .constraints([
@@ -79,16 +94,6 @@ fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &Arc<Mutex<A
             ratatui::layout::Constraint::Length(20),
         ])
         .split(main_chunk);
-
-    let state = state.lock().unwrap();
-
-    // // 2. Render Stats
-    // let stats = Paragraph::new(format!(
-    //     "Total Blocks: {} | Total TXs: {}",
-    //     state.total_blocks, state.total_txs
-    // ))
-    // .block(Block::default().title("Stats").borders(Borders::ALL));
-    // f.render_widget(stats, main_chunks[0]);
 
     // 3. Render Blocks List
     let blocks: Vec<ListItem> = state
@@ -143,8 +148,7 @@ fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &Arc<Mutex<A
     f.render_widget(table, content_chunks[0]);
 }
 
-fn render_cached_txs(f: &mut Frame, main: Rect, state: &Arc<Mutex<AppState>>) {
-    let mut state = state.lock().unwrap();
+fn render_cached_txs(f: &mut Frame, main: Rect, state: &mut AppState) {
     // 3. Render transactions List
     let rows: Vec<Row> = state
         .cached_txs()
@@ -180,9 +184,18 @@ fn render_cached_txs(f: &mut Frame, main: Rect, state: &Arc<Mutex<AppState>>) {
             .title("Recent Transactions")
             .borders(Borders::ALL),
     )
-    .column_spacing(1);
+    .column_spacing(1)
+    .row_highlight_style(
+        ratatui::style::Style::default()
+            .bg(ratatui::style::Color::Yellow)
+            .fg(ratatui::style::Color::Black)
+            .add_modifier(ratatui::style::Modifier::BOLD),
+    );
 
     f.render_stateful_widget(table, main, &mut state.cached_t_state);
+    state.cached_sb_state = state
+        .cached_sb_state
+        .position(state.cached_t_state.offset());
 
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
         .begin_symbol(Some("↑"))

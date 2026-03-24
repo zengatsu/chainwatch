@@ -51,7 +51,7 @@ impl AppState {
         };
         self.cached_t_state.select(Some(i));
         // Sync scrollbar position with the table selection
-        self.cached_sb_state = self.cached_sb_state.position(i);
+        // self.cached_sb_state = self.cached_sb_state.position(i);
     }
 
     pub fn previous(&mut self) {
@@ -66,7 +66,7 @@ impl AppState {
             None => 0,
         };
         self.cached_t_state.select(Some(i));
-        self.cached_sb_state = self.cached_sb_state.position(i);
+        // self.cached_sb_state = self.cached_sb_state.position(i);
     }
 
     pub fn cached_txs(&self) -> &[Transaction] {
