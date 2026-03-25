@@ -42,11 +42,17 @@ async fn main() -> Result<()> {
         while let Some(tx) = tx_receiver.recv().await {
             let value_str = tx.eth_value.to_string();
             let block = tx.block_number as i64;
-            sqlx::query_unchecked!(
-                "INSERT INTO transactions (block_number, tx_hash, from_addr, to_addr, eth_value, is_whale, is_stylus) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)",
-                block, tx.tx_hash, tx.from_addr, tx.to_addr, value_str, tx.is_whale, tx.is_stylus
+            sqlx::query(
+                "INSERT INTO transactions (block_number, tx_hash, from_addr, to_addr, eth_value, is_whale, is_stylus)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)"
             )
+            .bind(block)
+            .bind(&tx.tx_hash)
+            .bind(&tx.from_addr)
+            .bind(&tx.to_addr)
+            .bind(&value_str)
+            .bind(tx.is_whale)
+            .bind(tx.is_stylus)
             .execute(&pool)
             .await
             .ok();
