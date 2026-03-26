@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chainwatch | Arbitrum Stylus Analytics</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #121212;
+            --primary: #28a0f0;
+            --accent: #00ff41;
+            --text: #e0e0e0;
+            --text-dim: #888;
+            --border: #222;
+            --font-mono: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font-mono);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Scanline Effect */
+        body::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+            z-index: 100;
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-weight: bold;
+            color: var(--primary);
+            letter-spacing: -1px;
+            font-size: 1.2rem;
+        }
+
+        .nav-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary);
+        }
+
+        .hero {
+            padding: 6rem 0;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            letter-spacing: -2px;
+        }
+
+        .hero p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            text-decoration: none;
+            font-weight: bold;
+            border: 1px solid var(--primary);
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--bg);
+        }
+
+        .btn-primary:hover {
+            background: transparent;
+            color: var(--primary);
+        }
+
+        .btn-secondary {
+            color: var(--primary);
+            background: transparent;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(40, 160, 240, 0.1);
+        }
+
+        .terminal-window {
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin: 4rem 0;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background: #1a1a1a;
+            padding: 0.5rem 1rem;
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #333;
+        }
+
+        .terminal-body {
+            padding: 1.5rem;
+            color: var(--accent);
+            font-size: 0.9rem;
+            text-align: left;
+            overflow-x: auto;
+        }
+
+        .line {
+            opacity: 0;
+            transform: translateY(5px);
+            margin-bottom: 4px;
+            animation: revealLine 10s infinite;
+        }
+
+        /* Staggered Delays for Lines */
+        .line:nth-child(1) {
+            animation-delay: 0.5s;
+        }
+
+        .line:nth-child(2) {
+            animation-delay: 1.2s;
+        }
+
+        .line:nth-child(3) {
+            animation-delay: 2.0s;
+        }
+
+        .line:nth-child(4) {
+            animation-delay: 2.8s;
+        }
+
+        .line:nth-child(5) {
+            animation-delay: 3.5s;
+        }
+
+        .line:nth-child(6) {
+            animation-delay: 4.2s;
+        }
+
+        .line:nth-child(7) {
+            animation-delay: 5.0s;
+        }
+
+        .line:nth-child(8) {
+            animation-delay: 5.0s;
+        }
+
+        .line:nth-child(9) {
+            animation-delay: 5.0s;
+        }
+
+        .line:nth-child(10) {
+            animation-delay: 5.0s;
+        }
+
+        @keyframes revealLine {
+            0% {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            5% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Line appears */
+            70% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Line stays visible until 7s mark */
+            75% {
+                opacity: 0;
+                transform: translateY(0);
+            }
+
+            /* All lines vanish (Clear) */
+            100% {
+                opacity: 0;
+            }
+
+            /* Wait before restart */
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 4rem;
+        }
+
+        .feature-card {
+            padding: 2rem;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            transition: 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+        }
+
+        .feature-card h3 {
+            margin-bottom: 1rem;
+            color: var(--primary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .feature-card p {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        .tag {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            background: #222;
+            border-radius: 3px;
+            color: var(--primary);
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 4rem 0;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <div class="logo">CHAINWATCH_</div>
+            <a href="https://github.com/zengatsu/chainwatch" class="nav-link">GitHub</a>
+        </header>
+
+        <section class="hero">
+            <h1>The Pulse of the Arbitrum Frontier</h1>
+            <p>High-performance, local-first analytics for Stylus. Detect WASM contracts and track whales.</p>
+            <div class="cta-group">
+                <a href="#" class="btn btn-primary">Download Binary</a>
+                <a href="#" class="btn btn-secondary">Documentation</a>
+            </div>
+
+            <div class="terminal-window">
+                <div class="terminal-header">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+                <div class="terminal-body">
+                    <div class="line" style="color: #888;">$ chainwatch --stream</div>
+                    <!-- <div class="line">[INFO] Connected to Arbitrum RPC</div>
+                    <div class="line">[SCAN] Magic Header Found: <span style="color: #fff;">0xef00</span> <span
+                            class="tag">STYLUS_DETECTED</span></div>
+                    <div class="line">[LIVE] Transfer: 450.5 ETH | <span style="color: var(--primary);">Whale
+                            Alert</span></div> -->
+                    <div class="line">445646196, 0x4a1f76b7f6183a32..., 0x973dFb4B29f316Ae..., 0x1efB18bE23Bc417A...
+                    </div>
+                    <div class="line">445646196, 0x1572c5a501a246db..., 0x3faD7301bEAA92b8..., 0xa900408f8bD53709...
+                    </div>
+                    <div class="line">445646196, 0xa21db789accc4043..., 0x7518F27D43b48453..., 0x267d9599cC7324ad...
+                    </div>
+                    <div class="line">445646196, 0x4e137d7f9c8b0ba5..., 0xc80Afd311c962652..., 0x3082CC23568eA640...
+                    </div>
+                    <div class="line"><br>> Monitoring the feed... <span style="animation: blink 1s infinite;">_</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="feature-card">
+                <h3>Stylus contract Detection</h3>
+                <p>Identifies WASM-based contracts.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Bring Your Own Key</h3>
+                <p>Total privacy. No centralized tracking, no middleman. Connect your own RPC and keep your alpha on
+                    your machine.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Local Persistence</h3>
+                <p>Stores historical Arbitrum activity in a local SQLite database or csv file. Query and analyze data
+                    offline at
+                    Rust speeds.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Single Binary</h3>
+                <p>One file. Zero dependencies. Available for Windows, macOS (Intel/M1), and Linux.
+                </p>
+            </div>
+        </section>
+
+        <footer>
+            Built for the Arbitrum Stylus Ecosystem. No tracking. No cookies. Just performance.
+        </footer>
+    </div>
+
+    <style>
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
+
+</body>
+
+</html>
