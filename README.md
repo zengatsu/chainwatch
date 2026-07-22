@@ -65,7 +65,7 @@ Use this if you want to compile from the current source tree or if no binary is 
    ```
 3. Create a `.env` file with the required endpoints and database URL
    ```dotenv
-   DATABASE_URL=sqlite:chainwatch.db
+   DATABASE_URL=sqlite:data/chainwatch.db
    WS_URL=wss://your-arbitrum-ws-endpoint
    RPC_URL=https://your-arbitrum-rpc-endpoint
    ```
@@ -73,7 +73,7 @@ Use this if you want to compile from the current source tree or if no binary is 
 
    Example:
    ```bash
-   sqlite3 chainwatch.db < src/migrations/_init.sql
+   sqlite3 data/chainwatch.db < src/migrations/_init.sql
    ```
 5. Run the built binary
    ```bash
