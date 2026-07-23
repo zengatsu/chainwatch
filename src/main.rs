@@ -89,8 +89,8 @@ async fn main() -> Result<()> {
                             KeyCode::Char('q') => break,
                             KeyCode::Char('l') | KeyCode::Right => tab = (tab + TABS + 1) % TABS,
                             KeyCode::Char('h') | KeyCode::Left => tab = (tab + TABS - 1) % TABS,
-                            KeyCode::Up | KeyCode::Char('k') => state.lock().unwrap().previous(),
-                            KeyCode::Down | KeyCode::Char('j') => state.lock().unwrap().next(),
+                            KeyCode::Up | KeyCode::Char('k') => state.lock().unwrap().previous(tab),
+                            KeyCode::Down | KeyCode::Char('j') => state.lock().unwrap().next(tab),
                             _ => {}
                         }
                     }

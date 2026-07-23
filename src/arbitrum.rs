@@ -86,14 +86,7 @@ pub async fn stream_transactions(
                 s.total_blocks += 1;
                 s.total_txs += s.last_txs.len() as u64;
                 s.last_blocks.push_front(header.number);
-                s.last_txs.extend(txs);
-                let excess = s.last_txs.len().saturating_sub(10);
-                if excess > 0 {
-                    s.last_txs.drain(0..excess);
-                }
-                if s.last_blocks.len() > 10 {
-                    s.last_blocks.pop_back();
-                }
+                s.append_last_txs(txs);
             }
         }
     });

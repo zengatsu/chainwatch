@@ -67,7 +67,7 @@ pub fn draw(f: &mut Frame<'_>, selected_tab: usize, state: &Arc<Mutex<AppState>>
     f.render_widget(stats, stats_chunk);
 
     match selected_tab {
-        0 => render_streaming_tab(f, content_chunk, &state),
+        0 => render_streaming_tab(f, content_chunk, &mut state),
         1 => render_cached_txs(f, content_chunk, &mut state),
 
         _ => unreachable!(),
@@ -86,7 +86,7 @@ pub fn render_tabs(f: &mut Frame, area: Rect, selected_tab: usize) {
     f.render_widget(tabs, area);
 }
 
-fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &AppState) {
+fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &mut AppState) {
     let content_chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Horizontal)
         .constraints([
@@ -143,9 +143,31 @@ fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &AppState) {
             .title("Recent Transactions")
             .borders(Borders::ALL),
     )
-    .column_spacing(1);
+    .column_spacing(1)
+    .row_highlight_style(
+        ratatui::style::Style::default()
+            .bg(ratatui::style::Color::Yellow)
+            .fg(ratatui::style::Color::Black)
+            .add_modifier(ratatui::style::Modifier::BOLD),
+    );
 
-    f.render_widget(table, content_chunks[0]);
+    f.render_stateful_widget(table, content_chunks[0], &mut state.stream_t_state);
+    state.stream_sb_state = state
+        .stream_sb_state
+        .position(state.stream_t_state.offset());
+
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("↑"))
+        .end_symbol(Some("↓"));
+
+    f.render_stateful_widget(
+        scrollbar,
+        content_chunks[0].inner(Margin {
+            vertical: 1,
+            horizontal: 0,
+        }),
+        &mut state.stream_sb_state,
+    );
 }
 
 fn render_cached_txs(f: &mut Frame, main: Rect, state: &mut AppState) {
