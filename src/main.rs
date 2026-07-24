@@ -6,19 +6,15 @@ mod tui;
 use std::{
     env,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 
 use alloy::primitives::U256;
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode};
 use dotenv::dotenv;
 use eyre::Result;
 
 use arbitrum::{get_block_data, stream_transactions};
 use state::{AppState, Transaction};
-
-const TABS: usize = 2;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -61,7 +57,7 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(Mutex::new(AppState::new()));
     let fetch_state = Arc::clone(&state);
-    let mut tab = 0;
+    let tab = 0;
 
     let txs = db::get_cached_txs(&pool_clone).await;
     state.lock().unwrap().set_cached_txs(txs?);
@@ -73,30 +69,7 @@ async fn main() -> Result<()> {
         stream_transactions(ws_url, threshold, fetch_state, tx_sender, Some(cli.ui)).await?;
 
         // Initialize terminal using .then() for a more functional approach
-        let mut terminal = cli.ui.then(|| tui::setup_tui(Some(true))).transpose()?;
-
-        loop {
-            // Use .as_mut() to interact with the terminal only if it exists
-            if let Some(t) = terminal.as_mut() {
-                t.draw(|f| {
-                    tui::draw(f, tab, &state);
-                })?;
-
-                // Check for "Q" key to quit
-                if event::poll(Duration::from_millis(100))? {
-                    if let Event::Key(key) = event::read()? {
-                        match key.code {
-                            KeyCode::Char('q') => break,
-                            KeyCode::Char('l') | KeyCode::Right => tab = (tab + TABS + 1) % TABS,
-                            KeyCode::Char('h') | KeyCode::Left => tab = (tab + TABS - 1) % TABS,
-                            KeyCode::Up | KeyCode::Char('k') => state.lock().unwrap().previous(tab),
-                            KeyCode::Down | KeyCode::Char('j') => state.lock().unwrap().next(tab),
-                            _ => {}
-                        }
-                    }
-                }
-            }
-        }
+        let _ = cli.ui.then(|| tui::tui_loop(tab, state)).transpose()?;
 
         if cli.ui {
             tui::reset()?;
@@ -109,11 +82,13 @@ async fn main() -> Result<()> {
         .rpc
         .unwrap_or(env::var("RPC_URL").expect("RPC_URL must be set in .env file!"));
     get_block_data(rpc_url, cli.block, fetch_state).await?;
+
     if cli.ui {
-        let mut terminal = tui::setup_tui(None)?;
-        terminal.draw(|f| {
-            tui::draw(f, tab, &state);
-        })?;
+        let _ = tui::tui_loop(tab, state);
+
+        if cli.ui {
+            tui::reset()?;
+        }
     } else {
         state.lock().unwrap().print();
     }

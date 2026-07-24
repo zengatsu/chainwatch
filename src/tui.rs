@@ -1,4 +1,5 @@
 use crossterm::{
+    event::{self, Event, KeyCode},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -17,9 +18,12 @@ use ratatui::{
 use std::{
     io::Stdout,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
-use crate::state::AppState;
+use crate::{state::AppState, tui};
+
+const TABS: usize = 2;
 
 pub fn setup_tui(raw_mode: Option<bool>) -> Result<Terminal<CrosstermBackend<Stdout>>> {
     let mut stdout = std::io::stdout();
@@ -33,6 +37,33 @@ pub fn setup_tui(raw_mode: Option<bool>) -> Result<Terminal<CrosstermBackend<Std
     let terminal = Terminal::new(backend)?;
 
     Ok(terminal)
+}
+
+pub fn tui_loop(mut tab: usize, state: Arc<Mutex<AppState>>) -> Result<()> {
+    let mut terminal = tui::setup_tui(Some(true))?;
+
+    loop {
+        // Use .as_mut() to interact with the terminal only if it exists
+        terminal.draw(|f| {
+            tui::draw(f, tab, &state);
+        })?;
+
+        // Check for "Q" key to quit
+        if event::poll(Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('q') => break,
+                    KeyCode::Char('l') | KeyCode::Right => tab = (tab + TABS + 1) % TABS,
+                    KeyCode::Char('h') | KeyCode::Left => tab = (tab + TABS - 1) % TABS,
+                    KeyCode::Up | KeyCode::Char('k') => state.lock().unwrap().previous(tab),
+                    KeyCode::Down | KeyCode::Char('j') => state.lock().unwrap().next(tab),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 pub fn reset() -> Result<()> {
