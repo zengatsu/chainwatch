@@ -117,14 +117,17 @@ pub fn render_tabs(f: &mut Frame, area: Rect, selected_tab: usize) {
     f.render_widget(tabs, area);
 }
 
-fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &mut AppState) {
+fn render_streaming_tab(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
     let content_chunks = ratatui::layout::Layout::default()
         .direction(ratatui::layout::Direction::Horizontal)
         .constraints([
             ratatui::layout::Constraint::Percentage(100),
             ratatui::layout::Constraint::Length(20),
         ])
-        .split(main_chunk);
+        .split(area);
+
+    let table_area = content_chunks[0];
+    let side_area = content_chunks[1];
 
     // 3. Render Blocks List
     let blocks: Vec<ListItem> = state
@@ -137,7 +140,7 @@ fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &mut AppStat
             .title("Recent Blocks")
             .borders(Borders::ALL),
     );
-    f.render_widget(block_list, content_chunks[1]);
+    f.render_widget(block_list, side_area);
 
     // 3. Render transactions List
     let rows: Vec<Row> = state
@@ -182,27 +185,25 @@ fn render_streaming_tab(f: &mut Frame<'_>, main_chunk: Rect, state: &mut AppStat
             .add_modifier(ratatui::style::Modifier::BOLD),
     );
 
-    f.render_stateful_widget(table, content_chunks[0], &mut state.stream_t_state);
+    f.render_stateful_widget(table, table_area, &mut state.stream_t_state);
+
+    let viewport_length = table_area.height.saturating_sub(4) as usize;
+    let content_length = state.last_txs.len().saturating_sub(viewport_length);
+
     state.stream_sb_state = state
         .stream_sb_state
+        .content_length(content_length)
+        .viewport_content_length(viewport_length)
         .position(state.stream_t_state.offset());
 
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
         .begin_symbol(Some("↑"))
         .end_symbol(Some("↓"));
 
-    f.render_stateful_widget(
-        scrollbar,
-        content_chunks[0].inner(Margin {
-            vertical: 1,
-            horizontal: 0,
-        }),
-        &mut state.stream_sb_state,
-    );
+    f.render_stateful_widget(scrollbar, table_area, &mut state.stream_sb_state);
 }
 
-fn render_cached_txs(f: &mut Frame, main: Rect, state: &mut AppState) {
-    // 3. Render transactions List
+fn render_cached_txs(f: &mut Frame, table_area: Rect, state: &mut AppState) {
     let rows: Vec<Row> = state
         .cached_txs()
         .iter()
@@ -245,9 +246,15 @@ fn render_cached_txs(f: &mut Frame, main: Rect, state: &mut AppState) {
             .add_modifier(ratatui::style::Modifier::BOLD),
     );
 
-    f.render_stateful_widget(table, main, &mut state.cached_t_state);
+    f.render_stateful_widget(table, table_area, &mut state.cached_t_state);
+
+    let viewport_length = table_area.height.saturating_sub(4) as usize;
+    let content_length = state.cached_txs().len().saturating_sub(viewport_length);
+
     state.cached_sb_state = state
         .cached_sb_state
+        .content_length(content_length)
+        .viewport_content_length(viewport_length)
         .position(state.cached_t_state.offset());
 
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
@@ -256,7 +263,7 @@ fn render_cached_txs(f: &mut Frame, main: Rect, state: &mut AppState) {
 
     f.render_stateful_widget(
         scrollbar,
-        main.inner(Margin {
+        table_area.inner(Margin {
             vertical: 1, // Offset from top/bottom borders
             horizontal: 0,
         }),

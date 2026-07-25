@@ -73,7 +73,7 @@ impl AppState {
     }
 
     pub fn previous(&mut self, active_tab: usize) {
-        let (mut t_state, _, txs) = match active_tab {
+        let (t_state, _, txs) = match active_tab {
             0 => (
                 &mut self.stream_t_state,
                 self.stream_sb_state,
