@@ -13,6 +13,7 @@ pub struct AppState {
     pub cached_sb_state: ScrollbarState,
     pub stream_t_state: TableState,
     pub stream_sb_state: ScrollbarState,
+    pub stream_rows_length: usize,
 }
 
 impl AppState {
@@ -27,6 +28,7 @@ impl AppState {
             cached_sb_state: ScrollbarState::new(0),
             stream_t_state: TableState::default().with_selected(0),
             stream_sb_state: ScrollbarState::new(0),
+            stream_rows_length: 0,
         }
     }
 
@@ -43,22 +45,22 @@ impl AppState {
     }
 
     pub fn next(&mut self, active_tab: usize) {
-        let (t_state, _, txs) = match active_tab {
+        let (t_state, _, length) = match active_tab {
             0 => (
                 &mut self.stream_t_state,
                 self.stream_sb_state,
-                &self.last_txs,
+                &self.stream_rows_length,
             ),
             _ => (
                 &mut self.cached_t_state,
                 self.cached_sb_state,
-                &self.cached_txs,
+                &self.cached_txs.len(),
             ),
         };
 
         let i = match t_state.selected() {
             Some(i) => {
-                if i >= txs.len() - 1 {
+                if i >= length - 1 {
                     0
                 } else {
                     i + 1
@@ -73,23 +75,23 @@ impl AppState {
     }
 
     pub fn previous(&mut self, active_tab: usize) {
-        let (t_state, _, txs) = match active_tab {
+        let (t_state, _, length) = match active_tab {
             0 => (
                 &mut self.stream_t_state,
                 self.stream_sb_state,
-                &self.last_txs,
+                &self.stream_rows_length,
             ),
             _ => (
                 &mut self.cached_t_state,
                 self.cached_sb_state,
-                &self.cached_txs,
+                &self.cached_txs.len(),
             ),
         };
 
         let i = match t_state.selected() {
             Some(i) => {
                 if i == 0 {
-                    txs.len() - 1
+                    length - 1
                 } else {
                     i - 1
                 }
@@ -111,7 +113,6 @@ impl AppState {
     }
 
     pub fn append_last_txs(&mut self, txs: Vec<Transaction>) {
-        let prev_last = self.last_txs.len().saturating_sub(1);
         self.last_txs.extend(txs);
 
         // let excess = s.last_txs.len().saturating_sub(10);
@@ -121,13 +122,6 @@ impl AppState {
         // if s.last_blocks.len() > 10 {
         //     s.last_blocks.pop_back();
         // }
-
-        self.stream_sb_state = self.stream_sb_state.content_length(self.last_txs.len());
-        match self.stream_t_state.selected() {
-            Some(x) if x == prev_last => self.stream_t_state.select(Some(self.last_txs.len() - 1)),
-            None => self.stream_t_state.select(Some(self.last_txs.len() - 1)),
-            Some(_) => (),
-        }
     }
 }
 

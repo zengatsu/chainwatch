@@ -4,6 +4,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use eyre::Result;
+use itertools::Itertools;
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
@@ -129,7 +130,6 @@ fn render_streaming_tab(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
     let table_area = content_chunks[0];
     let side_area = content_chunks[1];
 
-    // 3. Render Blocks List
     let blocks: Vec<ListItem> = state
         .last_blocks
         .iter()
@@ -142,20 +142,28 @@ fn render_streaming_tab(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
     );
     f.render_widget(block_list, side_area);
 
-    // 3. Render transactions List
     let rows: Vec<Row> = state
         .last_txs
         .iter()
-        .map(|tx| {
-            Row::new(vec![
-                Cell::from(tx.tx_hash.to_string()),
-                Cell::from(tx.from_addr.to_string()),
-                Cell::from(tx.to_addr.to_string()),
-                Cell::from(if tx.is_whale { "X" } else { "" }),
-                Cell::from(if tx.is_stylus { "X" } else { "" }),
-            ])
+        .chunk_by(|x| x.block_number)
+        .into_iter()
+        .flat_map(|(block_number, group)| {
+            std::iter::once(Row::new(vec![Cell::from(format!("Block {block_number}"))])).chain(
+                group.map(|tx| {
+                    Row::new(vec![
+                        Cell::from(tx.tx_hash.to_string()),
+                        Cell::from(tx.from_addr.to_string()),
+                        Cell::from(tx.to_addr.to_string()),
+                        Cell::from(if tx.is_whale { "X" } else { "" }),
+                        Cell::from(if tx.is_stylus { "X" } else { "" }),
+                    ])
+                }),
+            )
         })
         .collect();
+
+    let prev_rows_length = state.stream_rows_length.saturating_sub(1);
+    state.stream_rows_length = rows.len();
 
     let table = Table::new(
         rows,
@@ -185,10 +193,23 @@ fn render_streaming_tab(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
             .add_modifier(ratatui::style::Modifier::BOLD),
     );
 
+    state.stream_sb_state = state
+        .stream_sb_state
+        .content_length(state.stream_rows_length);
+    match state.stream_t_state.selected() {
+        Some(x) if x == prev_rows_length => state
+            .stream_t_state
+            .select(Some(state.stream_rows_length.saturating_sub(1))),
+        None => state
+            .stream_t_state
+            .select(Some(state.stream_rows_length.saturating_sub(1))),
+        Some(_) => (),
+    }
+
     f.render_stateful_widget(table, table_area, &mut state.stream_t_state);
 
     let viewport_length = table_area.height.saturating_sub(4) as usize;
-    let content_length = state.last_txs.len().saturating_sub(viewport_length);
+    let content_length = state.stream_rows_length.saturating_sub(viewport_length);
 
     state.stream_sb_state = state
         .stream_sb_state
