@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use ratatui::widgets::{ScrollbarState, TableState};
+use ratatui::widgets::{ListState, ScrollbarState, TableState};
 use sqlx::FromRow;
 
 pub struct AppState {
@@ -14,6 +14,8 @@ pub struct AppState {
     pub stream_t_state: TableState,
     pub stream_sb_state: ScrollbarState,
     pub stream_rows_length: usize,
+    pub blocks_ls_state: ListState,
+    pub blocks_sb_state: ScrollbarState,
 }
 
 impl AppState {
@@ -29,6 +31,8 @@ impl AppState {
             stream_t_state: TableState::default().with_selected(0),
             stream_sb_state: ScrollbarState::new(0),
             stream_rows_length: 0,
+            blocks_ls_state: ListState::default().with_selected(Some(0)),
+            blocks_sb_state: ScrollbarState::new(0),
         }
     }
 

@@ -228,6 +228,24 @@ fn render_blocks_table(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
             .title("Recent Blocks")
             .borders(Borders::ALL),
     );
+
+    f.render_widget(block_list, area);
+
+    f.render_stateful_widget(block_list, area, &mut state.blocks_ls_state);
+    let viewport_length = area.height.saturating_sub(2) as usize;
+    let content_length = state.last_blocks.len().saturating_sub(viewport_length);
+
+    state.blocks_sb_state = state
+        .blocks_sb_state
+        .content_length(content_length)
+        .viewport_content_length(viewport_length)
+        .position(state.blocks_ls_state.offset());
+
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("↑"))
+        .end_symbol(Some("↓"));
+
+    f.render_stateful_widget(scrollbar, area, &mut state.blocks_sb_state);
 }
 
 fn render_cached_txs(f: &mut Frame, table_area: Rect, state: &mut AppState) {
