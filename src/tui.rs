@@ -130,18 +130,11 @@ fn render_streaming_tab(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
     let table_area = content_chunks[0];
     let side_area = content_chunks[1];
 
-    let blocks: Vec<ListItem> = state
-        .last_blocks
-        .iter()
-        .map(|b| ListItem::new(format!("{}", b)))
-        .collect();
-    let block_list = List::new(blocks).block(
-        Block::default()
-            .title("Recent Blocks")
-            .borders(Borders::ALL),
-    );
-    f.render_widget(block_list, side_area);
+    render_stream_txs(f, table_area, state);
+    render_blocks_table(f, side_area, state);
+}
 
+fn render_stream_txs(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
     let rows: Vec<Row> = state
         .last_txs
         .iter()
@@ -206,9 +199,9 @@ fn render_streaming_tab(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
         Some(_) => (),
     }
 
-    f.render_stateful_widget(table, table_area, &mut state.stream_t_state);
+    f.render_stateful_widget(table, area, &mut state.stream_t_state);
 
-    let viewport_length = table_area.height.saturating_sub(4) as usize;
+    let viewport_length = area.height.saturating_sub(4) as usize;
     let content_length = state.stream_rows_length.saturating_sub(viewport_length);
 
     state.stream_sb_state = state
@@ -221,7 +214,20 @@ fn render_streaming_tab(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
         .begin_symbol(Some("↑"))
         .end_symbol(Some("↓"));
 
-    f.render_stateful_widget(scrollbar, table_area, &mut state.stream_sb_state);
+    f.render_stateful_widget(scrollbar, area, &mut state.stream_sb_state);
+}
+
+fn render_blocks_table(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
+    let blocks: Vec<ListItem> = state
+        .last_blocks
+        .iter()
+        .map(|b| ListItem::new(format!("{}", b)))
+        .collect();
+    let block_list = List::new(blocks).block(
+        Block::default()
+            .title("Recent Blocks")
+            .borders(Borders::ALL),
+    );
 }
 
 fn render_cached_txs(f: &mut Frame, table_area: Rect, state: &mut AppState) {
