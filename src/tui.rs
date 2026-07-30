@@ -229,8 +229,6 @@ fn render_blocks_table(f: &mut Frame<'_>, area: Rect, state: &mut AppState) {
             .borders(Borders::ALL),
     );
 
-    f.render_widget(block_list, area);
-
     f.render_stateful_widget(block_list, area, &mut state.blocks_ls_state);
     let viewport_length = area.height.saturating_sub(2) as usize;
     let content_length = state.last_blocks.len().saturating_sub(viewport_length);
